@@ -256,7 +256,7 @@ impl SnarlState {
     ) -> Self {
         let Some(data) = SnarlStateData::load(cx, id) else {
             cx.request_discard("Initial placing");
-            return Self::initial(id, snarl, ui_rect, min_scale, max_scale);
+            return Self::initial(cx, id, snarl, ui_rect, min_scale, max_scale);
         };
 
         let mut selected_nodes = SelectedNodes::load(cx, id).0;
@@ -276,7 +276,14 @@ impl SnarlState {
         }
     }
 
-    fn initial<T>(id: Id, snarl: &Snarl<T>, ui_rect: Rect, min_scale: f32, max_scale: f32) -> Self {
+    fn initial<T>(
+        cx: &Context,
+        id: Id,
+        snarl: &Snarl<T>,
+        ui_rect: Rect,
+        min_scale: f32,
+        max_scale: f32,
+    ) -> Self {
         let mut bb = Rect::NOTHING;
 
         for (_, node) in &snarl.nodes {
@@ -304,7 +311,14 @@ impl SnarlState {
             dirty: true,
             draw_order: Vec::new(),
             rect_selection: None,
-            selected_nodes: SmallVec::new(),
+            // A selection set before the widget's first frame must survive it.
+            //
+            // The non-initial path loads this, but the initial one used to start
+            // empty and then store that empty set at the end of the frame, so a
+            // selection written through `set_selected_nodes` before the first
+            // `show` was silently dropped — which is every selection restored
+            // together with a document.
+            selected_nodes: SelectedNodes::load(cx, id).0,
         }
     }
 
