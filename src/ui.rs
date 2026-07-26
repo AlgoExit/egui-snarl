@@ -28,7 +28,7 @@ mod wire;
 use self::{
     pin::AnyPin,
     state::{NewWires, NodeState, RowHeights, SnarlState},
-    wire::{draw_wire, hit_wire, pick_wire_style},
+    wire::{draw_wire, hit_wire, pick_wire_axis, pick_wire_style},
 };
 
 pub use self::{
@@ -872,6 +872,7 @@ struct PinResponse {
     pos: Pos2,
     wire_color: Color32,
     wire_style: WireStyle,
+    wire_axis: Option<WireAxis>,
 }
 
 /// Widget to display [`Snarl`] graph in [`Ui`].
@@ -1215,7 +1216,8 @@ where
                     latest_pos,
                     wire_width.max(2.0),
                     pick_wire_style(from_r.wire_style, to_r.wire_style),
-                    style.get_wire_axis(),
+                    pick_wire_axis(from_r.wire_axis, to_r.wire_axis)
+                        .unwrap_or_else(|| style.get_wire_axis()),
                 );
 
                 if wire_hit {
@@ -1253,7 +1255,8 @@ where
             Stroke::new(draw_width, color),
             wire_threshold,
             pick_wire_style(from_r.wire_style, to_r.wire_style),
-            style.get_wire_axis(),
+            pick_wire_axis(from_r.wire_axis, to_r.wire_axis)
+                .unwrap_or_else(|| style.get_wire_axis()),
         );
     }
 
@@ -1416,7 +1419,7 @@ where
                     Stroke::new(wire_width, to_r.wire_color),
                     wire_threshold,
                     to_r.wire_style,
-                    style.get_wire_axis(),
+                    to_r.wire_axis.unwrap_or_else(|| style.get_wire_axis()),
                 );
             }
         }
@@ -1437,7 +1440,7 @@ where
                     Stroke::new(wire_width, from_r.wire_color),
                     wire_threshold,
                     from_r.wire_style,
-                    style.get_wire_axis(),
+                    from_r.wire_axis.unwrap_or_else(|| style.get_wire_axis()),
                 );
             }
         }
@@ -1626,6 +1629,7 @@ where
                     pos: r.rect.center(),
                     wire_color: wire_info.color,
                     wire_style: wire_info.style,
+                    wire_axis: wire_info.axis,
                 },
             );
 
@@ -1793,6 +1797,7 @@ where
                     pos: r.rect.center(),
                     wire_color: wire_info.color,
                     wire_style: wire_info.style,
+                    wire_axis: wire_info.axis,
                 },
             );
 
