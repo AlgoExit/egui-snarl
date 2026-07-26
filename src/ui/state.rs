@@ -610,6 +610,34 @@ impl SnarlWidget {
         ctx.data(|d| d.get_temp::<SelectedNodes>(snarl_id).unwrap_or_default().0)
             .into_vec()
     }
+
+    /// Replaces the list of nodes selected in the UI for the `SnarlWidget` with same id.
+    ///
+    /// Use same `Ui` instance that was used in [`SnarlWidget::show`].
+    ///
+    /// The counterpart of [`SnarlWidget::get_selected_nodes`]. Without it an
+    /// application that persists its selection cannot restore it: the selection
+    /// lives in `egui` temp data and every write path into it is private, so a
+    /// restored document would come back with nothing selected.
+    #[inline]
+    pub fn set_selected_nodes(self, ui: &Ui, nodes: impl IntoIterator<Item = NodeId>) {
+        self.set_selected_nodes_at(ui.id(), ui.ctx(), nodes);
+    }
+
+    /// Replaces the list of nodes selected in the UI for the `SnarlWidget` with same id.
+    ///
+    /// `ui_id` must be the Id of the `Ui` instance that was used in [`SnarlWidget::show`].
+    #[inline]
+    pub fn set_selected_nodes_at(
+        self,
+        ui_id: Id,
+        ctx: &Context,
+        nodes: impl IntoIterator<Item = NodeId>,
+    ) {
+        let snarl_id = self.get_id(ui_id);
+
+        SelectedNodes(nodes.into_iter().collect()).save(ctx, snarl_id);
+    }
 }
 
 /// Returns nodes selected in the UI for the `SnarlWidget` with same ID.
