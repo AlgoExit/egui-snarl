@@ -547,6 +547,20 @@ pub struct SnarlStyle {
     )]
     pub select_on_plain_click: Option<bool>,
 
+    /// Flag to control whether a click on empty background clears the selection.
+    /// If set to true, a plain primary click that reaches the background — that is,
+    /// one that no node consumed — deselects all nodes.
+    ///
+    /// This is the counterpart of [`SnarlStyle::select_on_plain_click`]: without it
+    /// a selection made by a plain click cannot be undone by a plain click.
+    ///
+    /// Defaults to `false`, which is the historical behavior.
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
+    pub deselect_on_background_click: Option<bool>,
+
     /// Style for node selection.
     #[cfg_attr(
         feature = "serde",
@@ -698,6 +712,10 @@ impl SnarlStyle {
         self.select_on_plain_click.unwrap_or(false)
     }
 
+    fn get_deselect_on_background_click(&self) -> bool {
+        self.deselect_on_background_click.unwrap_or(false)
+    }
+
     fn get_select_style(&self, style: &Style) -> SelectionStyle {
         self.select_style.unwrap_or_else(|| SelectionStyle {
             margin: style.spacing.window_margin,
@@ -798,6 +816,7 @@ impl SnarlStyle {
             select_fill: None,
             select_rect_contained: None,
             select_on_plain_click: None,
+            deselect_on_background_click: None,
             select_style: None,
             crisp_magnified_text: None,
             wire_smoothness: None,
@@ -1070,6 +1089,21 @@ where
                 rect_selection_ended = Some(select_rect);
             }
             snarl_state.stop_rect_selection();
+        }
+    }
+
+    // Clear the selection when the click lands on empty background.
+    //
+    // Registered before any node, so nodes — drawn later and therefore on top —
+    // consume their own clicks and never reach here. The rect-selection block
+    // above cannot serve this: it is gated on `Shift` or an in-flight rect
+    // selection, and it only reacts to `drag_stopped`, so a click that never
+    // moved does not end a rect selection at all.
+    if style.get_deselect_on_background_click() && !modifiers.shift && !modifiers.command {
+        let deselect_resp = ui.interact(snarl_resp.rect, snarl_id.with("deselect"), Sense::click());
+
+        if deselect_resp.clicked_by(PointerButton::Primary) {
+            snarl_state.deselect_all_nodes();
         }
     }
 
