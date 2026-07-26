@@ -7,7 +7,8 @@ impl EguiScale for WireStyle {
     fn scale(&mut self, scale: f32) {
         match self {
             WireStyle::Line | WireStyle::Bezier3 | WireStyle::Bezier5 => {}
-            WireStyle::AxisAligned { corner_radius } => {
+            WireStyle::AxisAligned { corner_radius }
+            | WireStyle::AxisAlignedVertical { corner_radius } => {
                 corner_radius.scale(scale);
             }
         }

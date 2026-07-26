@@ -52,7 +52,24 @@ pub enum WireStyle {
 
     /// Draw wire as straight lines with 90 degree turns.
     /// Corners has radius of `corner_radius`.
+    ///
+    /// Routed for a left-to-right flow: the wire leaves the source sideways and
+    /// arrives at the target sideways.
     AxisAligned {
+        /// Radius of corners in wire.
+        corner_radius: f32,
+    },
+
+    /// [`WireStyle::AxisAligned`] rotated by 90 degrees, for a top-to-bottom
+    /// flow: the wire leaves the source downwards and arrives at the target
+    /// from above.
+    ///
+    /// With pins on the top and bottom edges the horizontal router enters the
+    /// pin from the side, so the wire visibly misses the pin it connects to.
+    /// The routing itself is identical — the endpoints are transposed, the same
+    /// router runs, and the result is transposed back, so there is one
+    /// implementation and no second set of corner cases.
+    AxisAlignedVertical {
         /// Radius of corners in wire.
         corner_radius: f32,
     },
@@ -74,6 +91,16 @@ pub const fn pick_wire_style(left: WireStyle, right: WireStyle) -> WireStyle {
         ) => WireStyle::AxisAligned {
             corner_radius: f32::max(a, b),
         },
+        (
+            WireStyle::AxisAlignedVertical { corner_radius: a },
+            WireStyle::AxisAlignedVertical { corner_radius: b },
+        ) => WireStyle::AxisAlignedVertical {
+            corner_radius: f32::max(a, b),
+        },
+        (WireStyle::AxisAlignedVertical { corner_radius }, _)
+        | (_, WireStyle::AxisAlignedVertical { corner_radius }) => {
+            WireStyle::AxisAlignedVertical { corner_radius }
+        }
         (WireStyle::AxisAligned { corner_radius }, _)
         | (_, WireStyle::AxisAligned { corner_radius }) => WireStyle::AxisAligned { corner_radius },
         (WireStyle::Bezier3, _) | (_, WireStyle::Bezier3) => WireStyle::Bezier3,
@@ -259,6 +286,7 @@ pub fn draw_wire(
         from,
         to,
         radius: 0.0,
+        vertical: false,
     };
 
     match style {
@@ -279,6 +307,15 @@ pub fn draw_wire(
         WireStyle::AxisAligned { corner_radius } => {
             let args = WireArgs {
                 radius: corner_radius,
+                ..args
+            };
+            draw_axis_aligned(ui, wire, args, stroke, threshold, shapes);
+        }
+
+        WireStyle::AxisAlignedVertical { corner_radius } => {
+            let args = WireArgs {
+                radius: corner_radius,
+                vertical: true,
                 ..args
             };
             draw_axis_aligned(ui, wire, args, stroke, threshold, shapes);
@@ -306,6 +343,7 @@ pub fn hit_wire(
         from,
         to,
         radius: 0.0,
+        vertical: false,
     };
 
     match style {
@@ -329,6 +367,15 @@ pub fn hit_wire(
         WireStyle::AxisAligned { corner_radius } => {
             let args = WireArgs {
                 radius: corner_radius,
+                ..args
+            };
+            hit_wire_axis_aligned(ctx, wire, args, pos, hit_threshold)
+        }
+
+        WireStyle::AxisAlignedVertical { corner_radius } => {
+            let args = WireArgs {
+                radius: corner_radius,
+                vertical: true,
                 ..args
             };
             hit_wire_axis_aligned(ctx, wire, args, pos, hit_threshold)
@@ -485,12 +532,19 @@ struct WireArgs {
     from: Pos2,
     to: Pos2,
     radius: f32,
+    /// Route for a top-to-bottom flow instead of left-to-right.
+    ///
+    /// Part of the cache KEY on purpose: the two routings give different
+    /// geometry for the same endpoints, and sharing one entry would hand a
+    /// wire the other one's shape.
+    vertical: bool,
 }
 
 impl Default for WireArgs {
     fn default() -> Self {
         WireArgs {
             frame_size: 0.0,
+            vertical: false,
             from: Pos2::ZERO,
             to: Pos2::ZERO,
             radius: 0.0,
@@ -732,7 +786,11 @@ impl WiresCache {
             return cached;
         }
 
-        let aawire = wire_axis_aligned(args.radius, args.frame_size, args.from, args.to);
+        let aawire = if args.vertical {
+            wire_axis_aligned_vertical(args.radius, args.frame_size, args.from, args.to)
+        } else {
+            wire_axis_aligned(args.radius, args.frame_size, args.from, args.to)
+        };
 
         cached.args = args;
         cached.aawire = aawire;
@@ -1065,6 +1123,41 @@ impl Default for AxisAlignedWire {
             turn_radii: [0.0; 4],
         }
     }
+}
+
+/// Swaps the axes of a point. Used to run the horizontal router on a vertical
+/// flow: transpose in, route, transpose out.
+#[inline]
+const fn transpose_pos(p: Pos2) -> Pos2 {
+    pos2(p.y, p.x)
+}
+
+/// [`wire_axis_aligned`] rotated by 90 degrees.
+///
+/// Routing is not reimplemented — endpoints are transposed, the same router
+/// runs, and every point it produced is transposed back. Corner cases (single
+/// segment, two turns, the S-shape when the target is behind the source) are
+/// therefore shared with the horizontal version by construction.
+fn wire_axis_aligned_vertical(
+    corner_radius: f32,
+    frame_size: f32,
+    from: Pos2,
+    to: Pos2,
+) -> AxisAlignedWire {
+    let mut wire = wire_axis_aligned(
+        corner_radius,
+        frame_size,
+        transpose_pos(from),
+        transpose_pos(to),
+    );
+    wire.aabb = Rect::from_two_pos(transpose_pos(wire.aabb.min), transpose_pos(wire.aabb.max));
+    for segment in &mut wire.segments {
+        *segment = (transpose_pos(segment.0), transpose_pos(segment.1));
+    }
+    for centre in &mut wire.turn_centers {
+        *centre = transpose_pos(*centre);
+    }
+    wire
 }
 
 #[allow(clippy::too_many_lines)]
