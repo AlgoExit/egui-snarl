@@ -2,7 +2,7 @@ use egui::{Color32, Painter, Rect, Shape, Stroke, Style, Vec2, epaint::PathShape
 
 use crate::{InPinId, OutPinId};
 
-use super::{SnarlStyle, WireStyle};
+use super::{SnarlStyle, WireAxis, WireStyle};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AnyPin {
@@ -31,6 +31,9 @@ pub struct PinWireInfo {
     /// Desired style of the wire.
     /// Zoomed with current scale.
     pub style: WireStyle,
+
+    /// Desired axis of the wire, if the pin asks for one.
+    pub axis: Option<WireAxis>,
 }
 
 /// Where a pin sits on its node, for implementations that place pins themselves.
@@ -141,11 +144,27 @@ pub struct PinInfo {
     /// Style of the wire connected to the pin.
     pub wire_style: Option<WireStyle>,
 
+    /// Axis the wire connected to the pin is routed along.
+    ///
+    /// Overrides [`SnarlStyle::wire_axis`] for this pin. Needed when a node
+    /// carries pins of more than one class — an execution chain leaving the
+    /// bottom edge and data entering from the side — because then the routing
+    /// has to match the edge the wire actually ends on, and one axis for the
+    /// whole editor can no longer be right for every wire.
+    pub wire_axis: Option<WireAxis>,
+
     /// Custom vertical position of a pin
     pub position: Option<f32>,
 }
 
 impl PinInfo {
+    /// Sets the axis the pin's wire is routed along.
+    #[must_use]
+    pub const fn with_wire_axis(mut self, axis: WireAxis) -> Self {
+        self.wire_axis = Some(axis);
+        self
+    }
+
     /// Sets the shape of the pin.
     #[must_use]
     pub const fn with_shape(mut self, shape: PinShape) -> Self {
@@ -257,6 +276,7 @@ impl PinInfo {
             style: self
                 .wire_style
                 .unwrap_or_else(|| snarl_style.get_wire_style()),
+            axis: self.wire_axis,
         }
     }
 }

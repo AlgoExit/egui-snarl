@@ -89,6 +89,22 @@ pub enum WireStyle {
     Bezier5,
 }
 
+/// Merges the axis asked for by the two pins a wire connects.
+///
+/// A pin that asks for nothing defers to the other end, and then to the
+/// editor-wide default. Two ends asking for different axes cannot both be
+/// honoured — the wire has one shape — so `Vertical` wins, mirroring how
+/// `pick_wire_style` resolves a disagreement by precedence rather than by
+/// picking an end.
+#[must_use]
+pub const fn pick_wire_axis(left: Option<WireAxis>, right: Option<WireAxis>) -> Option<WireAxis> {
+    match (left, right) {
+        (Some(WireAxis::Vertical), _) | (_, Some(WireAxis::Vertical)) => Some(WireAxis::Vertical),
+        (Some(axis), None | Some(_)) | (None, Some(axis)) => Some(axis),
+        (None, None) => None,
+    }
+}
+
 pub const fn pick_wire_style(left: WireStyle, right: WireStyle) -> WireStyle {
     match (left, right) {
         (WireStyle::Line, _) | (_, WireStyle::Line) => WireStyle::Line,
