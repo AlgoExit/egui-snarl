@@ -36,7 +36,7 @@ pub use self::{
     pin::{AnyPins, PinInfo, PinLayout, PinShape, PinWireInfo, SnarlPin},
     state::get_selected_nodes,
     viewer::SnarlViewer,
-    wire::{WireLayer, WireStyle},
+    wire::{WireAxis, WireLayer, WireStyle},
 };
 
 /// Controls how header, pins, body and footer are placed in the node.
@@ -456,6 +456,17 @@ pub struct SnarlStyle {
     )]
     pub wire_style: Option<WireStyle>,
 
+    /// Direction the graph flows in: left to right, or top to bottom.
+    ///
+    /// Applies to every wire style at once, because it is a property of the
+    /// editor rather than of a single wire. Defaults to
+    /// [`WireAxis::Horizontal`], the historical behavior.
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
+    pub wire_axis: Option<WireAxis>,
+
     /// Layer where wires are rendered.
     #[cfg_attr(
         feature = "serde",
@@ -647,6 +658,10 @@ impl SnarlStyle {
         self.wire_style.unwrap_or(WireStyle::Bezier5)
     }
 
+    fn get_wire_axis(&self) -> WireAxis {
+        self.wire_axis.unwrap_or_default()
+    }
+
     fn get_wire_layer(&self) -> WireLayer {
         self.wire_layer.unwrap_or(WireLayer::BehindNodes)
     }
@@ -799,6 +814,7 @@ impl SnarlStyle {
             downscale_wire_frame: None,
             upscale_wire_frame: None,
             wire_style: None,
+            wire_axis: None,
             wire_layer: None,
             header_drag_space: None,
             collapsible: None,
@@ -1199,6 +1215,7 @@ where
                     latest_pos,
                     wire_width.max(2.0),
                     pick_wire_style(from_r.wire_style, to_r.wire_style),
+                    style.get_wire_axis(),
                 );
 
                 if wire_hit {
@@ -1236,6 +1253,7 @@ where
             Stroke::new(draw_width, color),
             wire_threshold,
             pick_wire_style(from_r.wire_style, to_r.wire_style),
+            style.get_wire_axis(),
         );
     }
 
@@ -1398,6 +1416,7 @@ where
                     Stroke::new(wire_width, to_r.wire_color),
                     wire_threshold,
                     to_r.wire_style,
+                    style.get_wire_axis(),
                 );
             }
         }
@@ -1418,6 +1437,7 @@ where
                     Stroke::new(wire_width, from_r.wire_color),
                     wire_threshold,
                     from_r.wire_style,
+                    style.get_wire_axis(),
                 );
             }
         }

@@ -39,13 +39,34 @@ pub enum WireId {
     },
 }
 
+/// Direction the graph flows in, which decides how every wire is routed.
+///
+/// A property of the editor, not of an individual wire: mixing both in one
+/// graph would mean wires that leave a node sideways and wires that leave it
+/// downwards, and the reader could no longer tell direction from shape. Kept
+/// out of [`WireStyle`] for the same reason — otherwise every style would need
+/// a second variant and they could disagree.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "egui-probe", derive(egui_probe::EguiProbe))]
+pub enum WireAxis {
+    /// Left to right: wires leave the source sideways and arrive sideways.
+    #[default]
+    Horizontal,
+
+    /// Top to bottom: wires leave the source downwards and arrive from above.
+    ///
+    /// What pins on the top and bottom edges need — with horizontal routing the
+    /// wire approaches its pin from the side and visibly misses it.
+    Vertical,
+}
+
 /// Controls style in which wire is rendered.
 ///
 /// Variants are given in order of precedence when two pins require different styles.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "egui-probe", derive(egui_probe::EguiProbe))]
-#[derive(Default)]
 pub enum WireStyle {
     /// Straight line from one endpoint to another.
     Line,
@@ -56,20 +77,6 @@ pub enum WireStyle {
     /// Routed for a left-to-right flow: the wire leaves the source sideways and
     /// arrives at the target sideways.
     AxisAligned {
-        /// Radius of corners in wire.
-        corner_radius: f32,
-    },
-
-    /// [`WireStyle::AxisAligned`] rotated by 90 degrees, for a top-to-bottom
-    /// flow: the wire leaves the source downwards and arrives at the target
-    /// from above.
-    ///
-    /// With pins on the top and bottom edges the horizontal router enters the
-    /// pin from the side, so the wire visibly misses the pin it connects to.
-    /// The routing itself is identical — the endpoints are transposed, the same
-    /// router runs, and the result is transposed back, so there is one
-    /// implementation and no second set of corner cases.
-    AxisAlignedVertical {
         /// Radius of corners in wire.
         corner_radius: f32,
     },
@@ -91,16 +98,6 @@ pub const fn pick_wire_style(left: WireStyle, right: WireStyle) -> WireStyle {
         ) => WireStyle::AxisAligned {
             corner_radius: f32::max(a, b),
         },
-        (
-            WireStyle::AxisAlignedVertical { corner_radius: a },
-            WireStyle::AxisAlignedVertical { corner_radius: b },
-        ) => WireStyle::AxisAlignedVertical {
-            corner_radius: f32::max(a, b),
-        },
-        (WireStyle::AxisAlignedVertical { corner_radius }, _)
-        | (_, WireStyle::AxisAlignedVertical { corner_radius }) => {
-            WireStyle::AxisAlignedVertical { corner_radius }
-        }
         (WireStyle::AxisAligned { corner_radius }, _)
         | (_, WireStyle::AxisAligned { corner_radius }) => WireStyle::AxisAligned { corner_radius },
         (WireStyle::Bezier3, _) | (_, WireStyle::Bezier3) => WireStyle::Bezier3,
@@ -269,6 +266,7 @@ pub fn draw_wire(
     mut stroke: Stroke,
     threshold: f32,
     style: WireStyle,
+    axis: WireAxis,
 ) {
     if !ui.is_visible() {
         return;
@@ -286,7 +284,7 @@ pub fn draw_wire(
         from,
         to,
         radius: 0.0,
-        vertical: false,
+        vertical: matches!(axis, WireAxis::Vertical),
     };
 
     match style {
@@ -311,15 +309,6 @@ pub fn draw_wire(
             };
             draw_axis_aligned(ui, wire, args, stroke, threshold, shapes);
         }
-
-        WireStyle::AxisAlignedVertical { corner_radius } => {
-            let args = WireArgs {
-                radius: corner_radius,
-                vertical: true,
-                ..args
-            };
-            draw_axis_aligned(ui, wire, args, stroke, threshold, shapes);
-        }
     }
 }
 
@@ -335,6 +324,7 @@ pub fn hit_wire(
     pos: Pos2,
     hit_threshold: f32,
     style: WireStyle,
+    axis: WireAxis,
 ) -> bool {
     let frame_size = adjust_frame_size(frame_size, upscale, downscale, from, to);
 
@@ -343,7 +333,7 @@ pub fn hit_wire(
         from,
         to,
         radius: 0.0,
-        vertical: false,
+        vertical: matches!(axis, WireAxis::Vertical),
     };
 
     match style {
@@ -367,15 +357,6 @@ pub fn hit_wire(
         WireStyle::AxisAligned { corner_radius } => {
             let args = WireArgs {
                 radius: corner_radius,
-                ..args
-            };
-            hit_wire_axis_aligned(ctx, wire, args, pos, hit_threshold)
-        }
-
-        WireStyle::AxisAlignedVertical { corner_radius } => {
-            let args = WireArgs {
-                radius: corner_radius,
-                vertical: true,
                 ..args
             };
             hit_wire_axis_aligned(ctx, wire, args, pos, hit_threshold)
@@ -745,7 +726,11 @@ impl WiresCache {
             return cached;
         }
 
-        let points = wire_bezier_3(args.frame_size, args.from, args.to);
+        let points = if args.vertical {
+            wire_bezier_3_vertical(args.frame_size, args.from, args.to)
+        } else {
+            wire_bezier_3(args.frame_size, args.from, args.to)
+        };
         let aabb = Rect::from_points(&points);
 
         cached.args = args;
@@ -765,7 +750,11 @@ impl WiresCache {
             return cached;
         }
 
-        let points = wire_bezier_5(args.frame_size, args.from, args.to);
+        let points = if args.vertical {
+            wire_bezier_5_vertical(args.frame_size, args.from, args.to)
+        } else {
+            wire_bezier_5(args.frame_size, args.from, args.to)
+        };
         let aabb = Rect::from_points(&points);
 
         cached.args = args;
@@ -1130,6 +1119,16 @@ impl Default for AxisAlignedWire {
 #[inline]
 const fn transpose_pos(p: Pos2) -> Pos2 {
     pos2(p.y, p.x)
+}
+
+/// [`wire_bezier_5`] rotated by 90 degrees.
+fn wire_bezier_5_vertical(frame_size: f32, from: Pos2, to: Pos2) -> [Pos2; 6] {
+    wire_bezier_5(frame_size, transpose_pos(from), transpose_pos(to)).map(transpose_pos)
+}
+
+/// [`wire_bezier_3`] rotated by 90 degrees.
+fn wire_bezier_3_vertical(frame_size: f32, from: Pos2, to: Pos2) -> [Pos2; 4] {
+    wire_bezier_3(frame_size, transpose_pos(from), transpose_pos(to)).map(transpose_pos)
 }
 
 /// [`wire_axis_aligned`] rotated by 90 degrees.
