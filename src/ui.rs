@@ -532,6 +532,21 @@ pub struct SnarlStyle {
     /// If set to false, nodes intersecting with selection rect will be selected.
     pub select_rect_contained: Option<bool>,
 
+    /// Flag to control whether a click without modifiers selects a node.
+    /// If set to true, a plain primary click on a node makes it the only selected node.
+    /// If set to false, only `Shift`-click, `Cmd`/`Ctrl`-click and rect selection
+    /// change the selection.
+    ///
+    /// Clearing the selection by clicking empty background is not affected by this
+    /// flag and remains up to the application.
+    ///
+    /// Defaults to `false`, which is the historical behavior.
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
+    pub select_on_plain_click: Option<bool>,
+
     /// Style for node selection.
     #[cfg_attr(
         feature = "serde",
@@ -679,6 +694,10 @@ impl SnarlStyle {
         self.select_rect_contained.unwrap_or(false)
     }
 
+    fn get_select_on_plain_click(&self) -> bool {
+        self.select_on_plain_click.unwrap_or(false)
+    }
+
     fn get_select_style(&self, style: &Style) -> SelectionStyle {
         self.select_style.unwrap_or_else(|| SelectionStyle {
             margin: style.spacing.window_margin,
@@ -778,6 +797,7 @@ impl SnarlStyle {
             select_stoke: None,
             select_fill: None,
             select_rect_contained: None,
+            select_on_plain_click: None,
             select_style: None,
             crisp_magnified_text: None,
             wire_smoothness: None,
@@ -1881,6 +1901,8 @@ where
             snarl_state.select_one_node(modifiers.command, node);
         } else if modifiers.command {
             snarl_state.deselect_one_node(node);
+        } else if style.get_select_on_plain_click() {
+            snarl_state.select_one_node(true, node);
         }
     }
 
