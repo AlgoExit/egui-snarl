@@ -33,10 +33,50 @@ pub struct PinWireInfo {
     pub style: WireStyle,
 }
 
+/// Where a pin sits on its node, for implementations that place pins themselves.
+///
+/// The default placement puts inputs on the left edge and outputs on the right,
+/// which is all `x`, `y0` and `y1` can express. Laying pins out along the top and
+/// bottom edges instead — a top-to-bottom flow — needs the node's horizontal
+/// extent and the pin's ordinal, neither of which was reachable from `pin_rect`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PinLayout {
+    /// Frame rect of the whole node this pin belongs to.
+    pub node_rect: Rect,
+
+    /// Index of this pin among the node's inputs, or among its outputs.
+    pub index: usize,
+
+    /// Number of the node's inputs, or of its outputs.
+    pub count: usize,
+
+    /// `true` for an input pin, `false` for an output pin.
+    pub is_input: bool,
+}
+
+impl PinLayout {
+    /// Evenly spaced offset of this pin along an edge, in `0.0..=1.0`.
+    ///
+    /// `count + 1` gaps rather than `count`, so the pins sit inside the edge
+    /// instead of touching its corners, and a single pin lands in the middle.
+    #[must_use]
+    pub fn fraction_along_edge(&self) -> f32 {
+        #[allow(clippy::cast_precision_loss)]
+        {
+            (self.index as f32 + 1.0) / (self.count as f32 + 1.0)
+        }
+    }
+}
+
 /// Uses `Painter` to draw a pin.
 pub trait SnarlPin {
     /// Calculates pin Rect from the given parameters.
-    fn pin_rect(&self, x: f32, y0: f32, y1: f32, size: f32) -> Rect {
+    ///
+    /// `x` is the edge the default placement uses, `y0..=y1` is the pin's row.
+    /// `layout` additionally describes the node and the pin's ordinal, so an
+    /// implementation may place the pin anywhere on the node instead.
+    fn pin_rect(&self, layout: PinLayout, x: f32, y0: f32, y1: f32, size: f32) -> Rect {
+        let _ = layout;
         // Center vertically by default.
         let y = (y0 + y1) * 0.5;
         let pin_pos = pos2(x, y);

@@ -33,7 +33,7 @@ use self::{
 
 pub use self::{
     background_pattern::{BackgroundPattern, Grid},
-    pin::{AnyPins, PinInfo, PinShape, PinWireInfo, SnarlPin},
+    pin::{AnyPins, PinInfo, PinLayout, PinShape, PinWireInfo, SnarlPin},
     state::get_selected_nodes,
     viewer::SnarlViewer,
     wire::{WireLayer, WireStyle},
@@ -1472,6 +1472,7 @@ fn draw_inputs<T, V>(
     node_ui: &mut Ui,
     inputs_rect: Rect,
     payload_clip_rect: Rect,
+    node_rect: Rect,
     input_x: f32,
     min_pin_y_top: f32,
     min_pin_y_bottom: f32,
@@ -1532,6 +1533,12 @@ where
             }
 
             let pin_rect = snarl_pin.pin_rect(
+                PinLayout {
+                    node_rect,
+                    index: in_pin.id.input,
+                    count: inputs.len(),
+                    is_input: true,
+                },
                 input_x,
                 min_pin_y_top.max(y0),
                 min_pin_y_bottom.max(y1),
@@ -1631,6 +1638,7 @@ fn draw_outputs<T, V>(
     node_ui: &mut Ui,
     outputs_rect: Rect,
     payload_clip_rect: Rect,
+    node_rect: Rect,
     output_x: f32,
     min_pin_y_top: f32,
     min_pin_y_bottom: f32,
@@ -1692,6 +1700,12 @@ where
             }
 
             let pin_rect = snarl_pin.pin_rect(
+                PinLayout {
+                    node_rect,
+                    index: out_pin.id.output,
+                    count: outputs.len(),
+                    is_input: false,
+                },
                 output_x,
                 min_pin_y_top.max(y0),
                 min_pin_y_bottom.max(y1),
@@ -2059,6 +2073,7 @@ where
                     ui,
                     payload_rect,
                     payload_clip_rect,
+                    node_rect,
                     input_x,
                     node_rect.min.y,
                     node_rect.min.y + node_state.header_height(),
@@ -2097,6 +2112,7 @@ where
                     ui,
                     payload_rect,
                     payload_clip_rect,
+                    node_rect,
                     output_x,
                     node_rect.min.y,
                     node_rect.min.y + node_state.header_height(),
@@ -2184,6 +2200,7 @@ where
                     ui,
                     payload_rect,
                     payload_clip_rect,
+                    node_rect,
                     input_x,
                     node_rect.min.y,
                     node_rect.min.y + node_state.header_height(),
@@ -2259,6 +2276,7 @@ where
                     ui,
                     outputs_rect,
                     payload_clip_rect,
+                    node_rect,
                     output_x,
                     node_rect.min.y,
                     node_rect.min.y + node_state.header_height(),
@@ -2308,6 +2326,7 @@ where
                     ui,
                     outputs_rect,
                     payload_clip_rect,
+                    node_rect,
                     output_x,
                     node_rect.min.y,
                     node_rect.min.y + node_state.header_height(),
@@ -2383,6 +2402,7 @@ where
                     ui,
                     inputs_rect,
                     payload_clip_rect,
+                    node_rect,
                     input_x,
                     node_rect.min.y,
                     node_rect.min.y + node_state.header_height(),
