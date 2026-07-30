@@ -105,6 +105,20 @@ pub const fn pick_wire_axis(left: Option<WireAxis>, right: Option<WireAxis>) -> 
     }
 }
 
+/// Picks the wire width when both ends have an opinion.
+///
+/// The THICKER wins, and deliberately so: width is how a graph says "this wire
+/// carries control, not data", and a heavy wire thinning out halfway because
+/// the other end stayed silent would read as two different wires.
+#[must_use]
+pub fn pick_wire_width(left: Option<f32>, right: Option<f32>) -> Option<f32> {
+    match (left, right) {
+        (Some(a), Some(b)) => Some(a.max(b)),
+        (Some(w), None) | (None, Some(w)) => Some(w),
+        (None, None) => None,
+    }
+}
+
 pub const fn pick_wire_style(left: WireStyle, right: WireStyle) -> WireStyle {
     match (left, right) {
         (WireStyle::Line, _) | (_, WireStyle::Line) => WireStyle::Line,
