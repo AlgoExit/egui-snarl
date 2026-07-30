@@ -37,7 +37,7 @@ pub use self::{
     pin::{AnyPins, PinInfo, PinLayout, PinShape, PinWireInfo, SnarlPin},
     state::get_selected_nodes,
     viewer::SnarlViewer,
-    wire::{WireAxis, WireLayer, WireStyle},
+    wire::{WireAxis, WireLayer, WireStyle, pick_wire_width},
 };
 
 /// Controls how header, pins, body and footer are placed in the node.
@@ -954,6 +954,7 @@ struct PinResponse {
     wire_color: Color32,
     wire_style: WireStyle,
     wire_axis: Option<WireAxis>,
+    wire_width: Option<f32>,
 }
 
 /// Widget to display [`Snarl`] graph in [`Ui`].
@@ -1330,7 +1331,11 @@ where
 
         let color = mix_colors(from_r.wire_color, to_r.wire_color);
 
-        let mut draw_width = wire_width;
+        // Ширину задаёт ПИН, если у него есть мнение: иначе редактор рисует
+        // все провода одинаковыми и класс связи (исполнение против данных)
+        // читается только цветом.
+        let mut draw_width =
+            pick_wire_width(from_r.wire_width, to_r.wire_width).unwrap_or(wire_width);
         if hovered_wire == Some(wire) {
             draw_width *= 1.5;
         }
@@ -1726,6 +1731,7 @@ where
                     wire_color: wire_info.color,
                     wire_style: wire_info.style,
                     wire_axis: wire_info.axis,
+                    wire_width: wire_info.width,
                 },
             );
 
@@ -1894,6 +1900,7 @@ where
                     wire_color: wire_info.color,
                     wire_style: wire_info.style,
                     wire_axis: wire_info.axis,
+                    wire_width: wire_info.width,
                 },
             );
 

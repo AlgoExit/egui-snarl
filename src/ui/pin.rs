@@ -34,6 +34,17 @@ pub struct PinWireInfo {
 
     /// Desired axis of the wire, if the pin asks for one.
     pub axis: Option<WireAxis>,
+
+    /// Desired width of the wire, if the pin asks for one.
+    ///
+    /// `SnarlStyle::wire_width` is one number for the whole editor, so without
+    /// this a graph cannot make one class of wire read heavier than another —
+    /// which is how Unreal's Blueprint editor separates execution flow from
+    /// data (`DefaultExecutionWireThickness` 2.5 against
+    /// `DefaultDataWireThickness` 1.5).
+    ///
+    /// `None` means "no opinion" and falls back to the editor-wide width.
+    pub width: Option<f32>,
 }
 
 /// Where a pin sits on its node, for implementations that place pins themselves.
@@ -153,11 +164,23 @@ pub struct PinInfo {
     /// whole editor can no longer be right for every wire.
     pub wire_axis: Option<WireAxis>,
 
+    /// Overrides the editor-wide wire width for this pin.
+    ///
+    /// See [`PinWireInfo::width`] for why one number per editor is not enough.
+    pub wire_width: Option<f32>,
+
     /// Custom vertical position of a pin
     pub position: Option<f32>,
 }
 
 impl PinInfo {
+    /// Overrides the editor-wide wire width for this pin.
+    #[must_use]
+    pub const fn with_wire_width(mut self, width: f32) -> Self {
+        self.wire_width = Some(width);
+        self
+    }
+
     /// Sets the axis the pin's wire is routed along.
     #[must_use]
     pub const fn with_wire_axis(mut self, axis: WireAxis) -> Self {
@@ -277,6 +300,7 @@ impl PinInfo {
                 .wire_style
                 .unwrap_or_else(|| snarl_style.get_wire_style()),
             axis: self.wire_axis,
+            width: self.wire_width,
         }
     }
 }
