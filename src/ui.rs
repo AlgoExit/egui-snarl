@@ -3,7 +3,8 @@
 use std::collections::HashMap;
 
 use egui::{
-    Align, Color32, CornerRadius, Frame, Id, LayerId, Layout, Margin, Modifiers, PointerButton,
+    Align, Color32, CornerRadius, DragPanButtons, Frame, Id, LayerId, Layout, Margin, Modifiers,
+    PointerButton,
     Pos2, Rect, Scene, Sense, Shape, Stroke, StrokeKind, Style, Ui, UiBuilder, UiKind, UiStackInfo,
     Vec2,
     collapsing_header::paint_default_icon,
@@ -326,6 +327,46 @@ pub enum PinPlacement {
     },
 }
 
+/// Which pointer buttons pan the canvas by dragging.
+///
+/// Mirrors [`egui::containers::scene::DragPanButtons`] as an owned, serializable
+/// type: the egui flags are a `bitflags` newtype without `serde`/`egui-probe`
+/// derives, so embedding them in [`SnarlStyle`] would break both optional
+/// features.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "egui-probe", derive(egui_probe::EguiProbe))]
+pub struct PanButtons {
+    /// Left button.
+    pub primary: bool,
+    /// Right button.
+    pub secondary: bool,
+    /// Middle button (wheel press).
+    pub middle: bool,
+}
+
+impl Default for PanButtons {
+    /// Every button pans — the historical behavior, inherited from
+    /// `DragPanButtons::all()`.
+    fn default() -> Self {
+        Self {
+            primary: true,
+            secondary: true,
+            middle: true,
+        }
+    }
+}
+
+impl PanButtons {
+    fn to_egui(self) -> DragPanButtons {
+        let mut flags = DragPanButtons::empty();
+        flags.set(DragPanButtons::PRIMARY, self.primary);
+        flags.set(DragPanButtons::SECONDARY, self.secondary);
+        flags.set(DragPanButtons::MIDDLE, self.middle);
+        flags
+    }
+}
+
 /// Style for rendering Snarl.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -572,6 +613,36 @@ pub struct SnarlStyle {
     )]
     pub deselect_on_background_click: Option<bool>,
 
+    /// Flag to control whether a plain primary drag on empty background starts
+    /// a rect selection.
+    /// If set to true, dragging the background with no modifier draws a
+    /// selection rect — the convention of Figma, Blender and Unreal's Blueprint
+    /// editor.
+    /// If set to false, a rect selection needs `Shift`.
+    ///
+    /// Enabling this only makes sense together with [`SnarlStyle::pan_buttons`]:
+    /// while the primary button still pans, both would react to the same drag.
+    ///
+    /// Defaults to `false`, which is the historical behavior.
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
+    pub rect_select_on_plain_drag: Option<bool>,
+
+    /// Which pointer buttons pan the canvas by dragging.
+    ///
+    /// A right-drag pans without stealing the right-CLICK context menu: egui
+    /// tells a click from a drag by its own movement threshold, so a press that
+    /// never moves still opens the menu.
+    ///
+    /// Defaults to every button, which is the historical behavior.
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
+    pub pan_buttons: Option<PanButtons>,
+
     /// Style for node selection.
     #[cfg_attr(
         feature = "serde",
@@ -727,6 +798,14 @@ impl SnarlStyle {
         self.select_on_plain_click.unwrap_or(false)
     }
 
+    fn get_rect_select_on_plain_drag(&self) -> bool {
+        self.rect_select_on_plain_drag.unwrap_or(false)
+    }
+
+    fn get_pan_buttons(&self) -> DragPanButtons {
+        self.pan_buttons.unwrap_or_default().to_egui()
+    }
+
     fn get_deselect_on_background_click(&self) -> bool {
         self.deselect_on_background_click.unwrap_or(false)
     }
@@ -828,6 +907,8 @@ impl SnarlStyle {
             node_frame: None,
             header_frame: None,
             centering: None,
+            rect_select_on_plain_drag: None,
+            pan_buttons: None,
             select_stoke: None,
             select_fill: None,
             select_rect_contained: None,
@@ -1047,6 +1128,7 @@ where
     let mut snarl_resp = ui.response();
     Scene::new()
         .zoom_range(min_scale..=max_scale)
+        .drag_pan_buttons(style.get_pan_buttons())
         .register_pan_and_zoom(&ui, &mut snarl_resp, &mut to_global);
 
     if snarl_resp.changed() {
@@ -1088,7 +1170,21 @@ where
 
     // Process selection rect.
     let mut rect_selection_ended = None;
-    if modifiers.shift || snarl_state.is_rect_selection() {
+    // The select widget senses a drag by ANY button and, being registered after
+    // the scene, wins the interaction — so while it is up, nothing else can pan.
+    // Skip it while a non-primary button is held: that is exactly the gesture
+    // `pan_buttons` hands to the scene, and it is the only way the two can share
+    // one background rect.
+    let non_primary_drag = ui.input(|i| {
+        !i.pointer.button_down(PointerButton::Primary)
+            && (i.pointer.button_down(PointerButton::Secondary)
+                || i.pointer.button_down(PointerButton::Middle))
+    });
+    if !non_primary_drag
+        && (modifiers.shift
+            || style.get_rect_select_on_plain_drag()
+            || snarl_state.is_rect_selection())
+    {
         let select_resp = ui.interact(snarl_resp.rect, snarl_id.with("select"), Sense::drag());
 
         if select_resp.dragged_by(PointerButton::Primary)
