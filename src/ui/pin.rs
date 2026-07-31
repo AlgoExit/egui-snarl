@@ -4,9 +4,15 @@ use crate::{InPinId, OutPinId};
 
 use super::{SnarlStyle, WireAxis, WireStyle};
 
+/// One pin, either side.
+///
+/// Used where a pin is named without knowing its direction in advance — the
+/// pin under the pointer, for instance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AnyPin {
+    /// An output pin.
     Out(OutPinId),
+    /// An input pin.
     In(InPinId),
 }
 
