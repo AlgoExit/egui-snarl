@@ -2139,7 +2139,21 @@ where
         } else if modifiers.command {
             snarl_state.deselect_one_node(node);
         } else if style.get_select_on_plain_click() {
-            snarl_state.select_one_node(true, node);
+            // Dragging a node that is already part of the selection keeps the
+            // selection: that is what makes the whole set move together, and it
+            // is the behaviour of every editor that has both a marquee and
+            // draggable items. Collapsing to one node here would wipe the
+            // marquee the instant the drag begins, and the multi-node move
+            // below would never see more than the grabbed node.
+            //
+            // A plain CLICK still collapses the selection — that is what the
+            // option is for.
+            let dragging_a_member = r.dragged_by(PointerButton::Primary)
+                && snarl_state.selected_nodes().contains(&node);
+
+            if !dragging_a_member {
+                snarl_state.select_one_node(true, node);
+            }
         }
     }
 
