@@ -37,7 +37,7 @@ pub use self::{
     pin::{AnyPins, PinInfo, PinLayout, PinShape, PinWireInfo, SnarlPin},
     state::get_selected_nodes,
     viewer::SnarlViewer,
-    wire::{WireAxis, WireLayer, WireStyle, pick_wire_width},
+    wire::{WireAxis, WireLayer, WireStyle, WireTangent, WireTangentRule, pick_wire_width},
 };
 
 /// Controls how header, pins, body and footer are placed in the node.
@@ -669,6 +669,21 @@ pub struct SnarlStyle {
     )]
     pub wire_smoothness: Option<f32>,
 
+    /// Makes the wire's curvature follow the distance between its pins instead
+    /// of a fixed [`SnarlStyle::wire_frame_size`].
+    ///
+    /// When set, it replaces `wire_frame_size` together with
+    /// [`SnarlStyle::upscale_wire_frame`] and
+    /// [`SnarlStyle::downscale_wire_frame`] — those three describe the same
+    /// thing in a coarser way and would only fight this one.
+    ///
+    /// Left unset by default, so nothing changes for existing graphs.
+    #[cfg_attr(
+        feature = "serde",
+        serde(skip_serializing_if = "Option::is_none", default)
+    )]
+    pub wire_tangent: Option<WireTangentRule>,
+
     #[doc(hidden)]
     #[cfg_attr(feature = "egui-probe", egui_probe(skip))]
     #[cfg_attr(feature = "serde", serde(skip_serializing, default))]
@@ -826,6 +841,10 @@ impl SnarlStyle {
     fn get_wire_smoothness(&self) -> f32 {
         self.wire_smoothness.unwrap_or(1.0)
     }
+
+    fn get_wire_tangent(&self) -> Option<WireTangentRule> {
+        self.wire_tangent
+    }
 }
 
 #[cfg(feature = "serde")]
@@ -917,6 +936,7 @@ impl SnarlStyle {
             select_style: None,
             crisp_magnified_text: None,
             wire_smoothness: None,
+            wire_tangent: None,
 
             _non_exhaustive: (),
         }
@@ -1224,6 +1244,7 @@ where
     let wire_frame_size = style.get_wire_frame_size(ui.style());
     let wire_width = style.get_wire_width(ui.style());
     let wire_threshold = style.get_wire_smoothness();
+    let wire_tangent = style.get_wire_tangent();
 
     let wire_shape_idx = match style.get_wire_layer() {
         WireLayer::BehindNodes => Some(ui.painter().add(Shape::Noop)),
@@ -1308,6 +1329,7 @@ where
                     wire_frame_size,
                     style.get_upscale_wire_frame(),
                     style.get_downscale_wire_frame(),
+                    wire_tangent,
                     from_r.pos,
                     to_r.pos,
                     latest_pos,
@@ -1351,6 +1373,7 @@ where
             wire_frame_size,
             style.get_upscale_wire_frame(),
             style.get_downscale_wire_frame(),
+            wire_tangent,
             from_r.pos,
             to_r.pos,
             Stroke::new(draw_width, color),
@@ -1515,6 +1538,7 @@ where
                     wire_frame_size,
                     style.get_upscale_wire_frame(),
                     style.get_downscale_wire_frame(),
+                    wire_tangent,
                     from_pos,
                     to_r.pos,
                     Stroke::new(wire_width, to_r.wire_color),
@@ -1536,6 +1560,7 @@ where
                     wire_frame_size,
                     style.get_upscale_wire_frame(),
                     style.get_downscale_wire_frame(),
+                    wire_tangent,
                     from_r.pos,
                     to_pos,
                     Stroke::new(wire_width, from_r.wire_color),
