@@ -1,4 +1,4 @@
-use egui::{Painter, Pos2, Rect, Style, Ui, emath::TSTransform};
+use egui::{Painter, Pos2, Rect, Stroke, Style, Ui, emath::TSTransform};
 
 use crate::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
 
@@ -214,19 +214,46 @@ pub trait SnarlViewer<T> {
         let _ = (node, inputs, outputs, ui, snarl);
     }
 
-    /// Checks if wire has something to show in widget.
-    /// This may not be called if wire is invisible.
+    /// Checks if the wire has something to show in a context menu when
+    /// right-clicked or long-touched.
+    ///
+    /// While the pointer is over a wire whose menu this returns `true` for, the
+    /// graph's own context menu is suppressed: one gesture, one owner.
     #[inline]
-    fn has_wire_widget(&mut self, from: &OutPinId, to: &InPinId, snarl: &Snarl<T>) -> bool {
+    fn has_wire_menu(&mut self, from: &OutPinId, to: &InPinId, snarl: &Snarl<T>) -> bool {
         let _ = (from, to, snarl);
         false
     }
 
-    /// Renders the wire's widget.
-    /// This may not be called if wire is invisible.
+    /// Renders the wire's context menu.
     #[inline]
-    fn show_wire_widget(&mut self, from: &OutPin, to: &InPin, ui: &mut Ui, snarl: &mut Snarl<T>) {
+    fn show_wire_menu(&mut self, from: &OutPin, to: &InPin, ui: &mut Ui, snarl: &mut Snarl<T>) {
         let _ = (from, to, ui, snarl);
+    }
+
+    /// The wire under the pointer was clicked with the primary button.
+    ///
+    /// Snarl keeps no wire selection of its own — a wire is not an entity it
+    /// owns the way it owns nodes — so an app that wants one hangs it here.
+    #[inline]
+    fn wire_clicked(&mut self, from: &OutPin, to: &InPin, snarl: &mut Snarl<T>) {
+        let _ = (from, to, snarl);
+    }
+
+    /// Last say on how the wire is stroked.
+    ///
+    /// `default` is what the pins and the style asked for. Override it to paint
+    /// a wire the app considers special — selected, erroring, traced.
+    #[inline]
+    fn wire_stroke(
+        &mut self,
+        from: &OutPinId,
+        to: &InPinId,
+        default: Stroke,
+        snarl: &Snarl<T>,
+    ) -> Stroke {
+        let _ = (from, to, snarl);
+        default
     }
 
     /// Checks if the snarl has something to show in context menu if right-clicked or long-touched on empty space at `pos`.
