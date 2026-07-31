@@ -27,14 +27,13 @@ mod viewer;
 mod wire;
 
 use self::{
-    pin::AnyPin,
     state::{NewWires, NodeState, RowHeights, SnarlState},
     wire::{draw_wire, hit_wire, pick_wire_axis, pick_wire_style},
 };
 
 pub use self::{
     background_pattern::{BackgroundPattern, Grid},
-    pin::{AnyPins, PinInfo, PinLayout, PinShape, PinWireInfo, SnarlPin},
+    pin::{AnyPin, AnyPins, PinInfo, PinLayout, PinShape, PinWireInfo, SnarlPin},
     state::get_selected_nodes,
     viewer::SnarlViewer,
     wire::{WireAxis, WireLayer, WireStyle, WireTangent, WireTangentRule, pick_wire_width},
