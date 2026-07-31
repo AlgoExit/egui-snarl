@@ -1,7 +1,7 @@
 use core::f32;
 
 use ahash::HashMap;
-use egui::{Context, Id, Pos2, Rect, Shape, Stroke, Ui, cache::CacheTrait, pos2};
+use egui::{Context, Id, Pos2, Rect, Shape, Stroke, Ui, Vec2, cache::CacheTrait, pos2};
 
 use crate::{InPinId, OutPinId};
 
@@ -135,13 +135,106 @@ pub const fn pick_wire_style(left: WireStyle, right: WireStyle) -> WireStyle {
     }
 }
 
+/// How the delta between two pins turns into the horizontal offset of the
+/// wire's control point.
+///
+/// One half of a [`WireTangentRule`]: the forward half is used when the wire
+/// runs left to right, the backward half when it runs right to left.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "egui-probe", derive(egui_probe::EguiProbe))]
+pub struct WireTangent {
+    /// Per-axis cap applied to the delta before it is scaled.
+    ///
+    /// Without it a wire spanning the whole graph would grow an arbitrarily
+    /// deep belly.
+    pub range: Vec2,
+
+    /// Multiplier for the capped horizontal delta.
+    pub from_horizontal: f32,
+
+    /// Multiplier for the capped vertical delta.
+    pub from_vertical: f32,
+}
+
+impl WireTangent {
+    /// Control-point offset for the given pin-to-pin delta.
+    #[must_use]
+    fn offset(self, delta: Vec2) -> f32 {
+        let horizontal = delta.x.abs().min(self.range.x);
+        let vertical = delta.y.abs().min(self.range.y);
+        let tangent = self
+            .from_horizontal
+            .mul_add(horizontal, self.from_vertical * vertical);
+        // A cubic Bezier whose control point sits `f` away from the end has a
+        // Hermite tangent of `3 * f` there, and the numbers above are written
+        // as tangents. Dividing keeps them directly comparable with the graph
+        // editor they were taken from.
+        tangent / 3.0
+    }
+}
+
+/// Distance-proportional tangent rule for wires.
+///
+/// The alternative to a fixed [`SnarlStyle::wire_frame_size`]: the control
+/// point is pushed away from the pin by an amount that grows with the distance
+/// to the other pin, so short wires stay taut and long ones get a deep, legible
+/// belly. A fixed frame size cannot do both — set it large enough for long
+/// wires and short ones curl into loops, because the offset control points
+/// overshoot each other.
+///
+/// The defaults are the ones a certain well-known blueprint editor ships, and
+/// they are why its wires look the way they do.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "egui-probe", derive(egui_probe::EguiProbe))]
+pub struct WireTangentRule {
+    /// Used when the target pin is to the right of the source.
+    pub forward: WireTangent,
+
+    /// Used when it is to the left — a wire that has to double back.
+    ///
+    /// Its multipliers are usually larger: the wire needs to bulge out far
+    /// enough to clear the nodes it runs between.
+    pub backward: WireTangent,
+}
+
+impl Default for WireTangentRule {
+    #[inline]
+    fn default() -> Self {
+        WireTangentRule {
+            forward: WireTangent {
+                range: Vec2::splat(1000.0),
+                from_horizontal: 1.0,
+                from_vertical: 1.0,
+            },
+            backward: WireTangent {
+                range: Vec2::splat(200.0),
+                from_horizontal: 2.0,
+                from_vertical: 1.5,
+            },
+        }
+    }
+}
+
 fn adjust_frame_size(
     mut frame_size: f32,
     upscale: bool,
     downscale: bool,
+    tangent: Option<WireTangentRule>,
     from: Pos2,
     to: Pos2,
 ) -> f32 {
+    if let Some(tangent) = tangent {
+        let delta = to - from;
+        let half = if delta.x >= 0.0 {
+            tangent.forward
+        } else {
+            tangent.backward
+        };
+        return half.offset(delta);
+    }
+
     let length = (from - to).length();
     if upscale {
         frame_size = frame_size.max(length / 6.0);
@@ -291,6 +384,7 @@ pub fn draw_wire(
     frame_size: f32,
     upscale: bool,
     downscale: bool,
+    tangent: Option<WireTangentRule>,
     from: Pos2,
     to: Pos2,
     mut stroke: Stroke,
@@ -307,7 +401,7 @@ pub fn draw_wire(
         stroke.width = 1.0;
     }
 
-    let frame_size = adjust_frame_size(frame_size, upscale, downscale, from, to);
+    let frame_size = adjust_frame_size(frame_size, upscale, downscale, tangent, from, to);
 
     let args = WireArgs {
         frame_size,
@@ -349,6 +443,7 @@ pub fn hit_wire(
     frame_size: f32,
     upscale: bool,
     downscale: bool,
+    tangent: Option<WireTangentRule>,
     from: Pos2,
     to: Pos2,
     pos: Pos2,
@@ -356,7 +451,7 @@ pub fn hit_wire(
     style: WireStyle,
     axis: WireAxis,
 ) -> bool {
-    let frame_size = adjust_frame_size(frame_size, upscale, downscale, from, to);
+    let frame_size = adjust_frame_size(frame_size, upscale, downscale, tangent, from, to);
 
     let args = WireArgs {
         frame_size,
