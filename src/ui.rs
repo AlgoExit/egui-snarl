@@ -1380,6 +1380,7 @@ where
         let stroke = viewer.wire_stroke(
             &wire.out_pin,
             &wire.in_pin,
+            pin_hovered,
             Stroke::new(draw_width, color),
             snarl,
         );
