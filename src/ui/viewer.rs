@@ -4,7 +4,7 @@ use crate::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
 
 use super::{
     BackgroundPattern, NodeLayout, SnarlStyle,
-    pin::{AnyPins, SnarlPin},
+    pin::{AnyPin, AnyPins, SnarlPin},
 };
 
 /// `SnarlViewer` is a trait for viewing a Snarl.
@@ -244,15 +244,21 @@ pub trait SnarlViewer<T> {
     ///
     /// `default` is what the pins and the style asked for. Override it to paint
     /// a wire the app considers special — selected, erroring, traced.
+    ///
+    /// `hovered_pin` is the pin under the pointer this frame, if any. It is
+    /// passed rather than left for the viewer to remember because the answer
+    /// is only correct for the frame it was computed in, and a viewer that
+    /// cached it would be one repaint away from painting a stale emphasis.
     #[inline]
     fn wire_stroke(
         &mut self,
         from: &OutPinId,
         to: &InPinId,
+        hovered_pin: Option<AnyPin>,
         default: Stroke,
         snarl: &Snarl<T>,
     ) -> Stroke {
-        let _ = (from, to, snarl);
+        let _ = (from, to, hovered_pin, snarl);
         default
     }
 
