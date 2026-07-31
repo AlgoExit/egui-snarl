@@ -1302,6 +1302,9 @@ where
 
     let mut hovered_wire = None;
     let mut hovered_wire_disconnect = false;
+    let mut hovered_wire_click = false;
+    let mut hovered_wire_menu = false;
+    let mut hovered_wire_r = None;
     let mut wire_shapes = Vec::new();
 
     // Draw and interact with wires
@@ -1345,8 +1348,20 @@ where
                     let wire_r =
                         ui.interact(snarl_resp.rect, ui.make_persistent_id(wire), Sense::click());
 
-                    //Remove hovered wire by second click
-                    hovered_wire_disconnect |= wire_r.clicked_by(PointerButton::Secondary);
+                    // A wire with its own menu owns the secondary button: the
+                    // menu is the place to break it from, and disconnecting on
+                    // the same click would fire behind the menu that is about
+                    // to open.
+                    hovered_wire_menu = viewer.has_wire_menu(&wire.out_pin, &wire.in_pin, snarl);
+
+                    if hovered_wire_menu {
+                        hovered_wire_r = Some(wire_r.clone());
+                    } else {
+                        //Remove hovered wire by second click
+                        hovered_wire_disconnect |= wire_r.clicked_by(PointerButton::Secondary);
+                    }
+
+                    hovered_wire_click |= wire_r.clicked_by(PointerButton::Primary);
                 }
             }
         }
@@ -1362,6 +1377,13 @@ where
             draw_width *= 1.5;
         }
 
+        let stroke = viewer.wire_stroke(
+            &wire.out_pin,
+            &wire.in_pin,
+            Stroke::new(draw_width, color),
+            snarl,
+        );
+
         draw_wire(
             &ui,
             WireId::Connected {
@@ -1376,7 +1398,7 @@ where
             wire_tangent,
             from_r.pos,
             to_r.pos,
-            Stroke::new(draw_width, color),
+            stroke,
             wire_threshold,
             pick_wire_style(from_r.wire_style, to_r.wire_style),
             pick_wire_axis(from_r.wire_axis, to_r.wire_axis)
@@ -1389,6 +1411,20 @@ where
         let out_pin = OutPin::new(snarl, wire.out_pin);
         let in_pin = InPin::new(snarl, wire.in_pin);
         viewer.disconnect(&out_pin, &in_pin, snarl);
+    }
+
+    if hovered_wire_click && let Some(wire) = hovered_wire {
+        let out_pin = OutPin::new(snarl, wire.out_pin);
+        let in_pin = InPin::new(snarl, wire.in_pin);
+        viewer.wire_clicked(&out_pin, &in_pin, snarl);
+    }
+
+    if let (Some(wire), Some(wire_r)) = (hovered_wire, hovered_wire_r.as_ref()) {
+        let out_pin = OutPin::new(snarl, wire.out_pin);
+        let in_pin = InPin::new(snarl, wire.in_pin);
+        wire_r.context_menu(|ui| {
+            viewer.show_wire_menu(&out_pin, &in_pin, ui, snarl);
+        });
     }
 
     if let Some(select_rect) = rect_selection_ended {
@@ -1515,7 +1551,7 @@ where
                     snarl_state.set_new_wires_menu(new_wires);
                 });
             }
-        } else if viewer.has_graph_menu(interact_pos, snarl) {
+        } else if !hovered_wire_menu && viewer.has_graph_menu(interact_pos, snarl) {
             snarl_resp.context_menu(|ui| {
                 let menu_pos = from_global * ui.cursor().min;
 
