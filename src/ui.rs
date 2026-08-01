@@ -1407,6 +1407,38 @@ where
             pick_wire_axis(from_r.wire_axis, to_r.wire_axis)
                 .unwrap_or_else(|| style.get_wire_axis()),
         );
+
+        // Decorations go on the polyline the wire was JUST drawn as, and only
+        // for wires that asked: the default predicate is `false`, so an editor
+        // that decorates nothing never computes a path.
+        if viewer.has_wire_decorations(&wire.out_pin, &wire.in_pin, snarl)
+            && let Some(points) = wire_points(
+                ui.ctx(),
+                WireId::Connected {
+                    snarl_id,
+                    out_pin: wire.out_pin,
+                    in_pin: wire.in_pin,
+                },
+                wire_frame_size,
+                style.get_upscale_wire_frame(),
+                style.get_downscale_wire_frame(),
+                wire_tangent,
+                from_r.pos,
+                to_r.pos,
+                wire_threshold,
+                pick_wire_style(from_r.wire_style, to_r.wire_style),
+                pick_wire_axis(from_r.wire_axis, to_r.wire_axis)
+                    .unwrap_or_else(|| style.get_wire_axis()),
+            )
+        {
+            viewer.decorate_wire(
+                &wire.out_pin,
+                &wire.in_pin,
+                &points,
+                &mut wire_shapes,
+                snarl,
+            );
+        }
     }
 
     // Remove hovered wire by second click
