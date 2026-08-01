@@ -22,19 +22,33 @@ pub enum WireLayer {
     AboveNodes,
 }
 
+/// Identifies one wire for geometry caching.
+///
+/// A wire being dragged has only one end, so the three variants are not a
+/// convenience: they are the three shapes a wire can have while it exists.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WireId {
+    /// A wire between two existing pins.
     Connected {
+        /// The editor this wire belongs to.
         snarl_id: Id,
+        /// The output end.
         out_pin: OutPinId,
+        /// The input end.
         in_pin: InPinId,
     },
+    /// A wire being dragged towards an input, with no output end yet.
     NewInput {
+        /// The editor this wire belongs to.
         snarl_id: Id,
+        /// The input end.
         in_pin: InPinId,
     },
+    /// A wire being dragged towards an output, with no input end yet.
     NewOutput {
+        /// The editor this wire belongs to.
         snarl_id: Id,
+        /// The output end.
         out_pin: OutPinId,
     },
 }
@@ -486,6 +500,57 @@ pub fn hit_wire(
             };
             hit_wire_axis_aligned(ctx, wire, args, pos, hit_threshold)
         }
+    }
+}
+
+/// The polyline this wire is drawn as — the SAME points, not a re-derivation.
+///
+/// Exposed so an application can place things ALONG a wire (execution-trace
+/// bubbles, midpoint badges, flow arrows) without re-implementing the curve.
+///
+/// Re-deriving the path app-side would look fine and then drift silently: the
+/// tangent rule, the frame-size adjustment and the sampling threshold all live
+/// here, and a change to any of them would leave the decorations sitting
+/// slightly beside the wire rather than on it. So this reads the same cache
+/// `draw_wire` reads, and returns the same `line(threshold)` it draws.
+///
+/// `None` for [`WireStyle::AxisAligned`], whose path is not cached as a
+/// polyline.
+///
+/// Additive and default-off: nothing inside the crate calls this.
+#[allow(clippy::too_many_arguments)]
+pub fn wire_points(
+    ctx: &Context,
+    wire: WireId,
+    frame_size: f32,
+    upscale: bool,
+    downscale: bool,
+    tangent: Option<WireTangentRule>,
+    from: Pos2,
+    to: Pos2,
+    threshold: f32,
+    style: WireStyle,
+    axis: WireAxis,
+) -> Option<Vec<Pos2>> {
+    let frame_size = adjust_frame_size(frame_size, upscale, downscale, tangent, from, to);
+
+    let args = WireArgs {
+        frame_size,
+        from,
+        to,
+        radius: 0.0,
+        vertical: matches!(axis, WireAxis::Vertical),
+    };
+
+    match style {
+        WireStyle::Line => Some(vec![from, to]),
+        WireStyle::Bezier3 => Some(ctx.memory_mut(|m| {
+            m.caches.cache::<WiresCache>().get_3(wire, args).line(threshold)
+        })),
+        WireStyle::Bezier5 => Some(ctx.memory_mut(|m| {
+            m.caches.cache::<WiresCache>().get_5(wire, args).line(threshold)
+        })),
+        WireStyle::AxisAligned { .. } => None,
     }
 }
 
