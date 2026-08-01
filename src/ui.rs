@@ -1240,6 +1240,7 @@ where
 
         if deselect_resp.clicked_by(PointerButton::Primary) {
             snarl_state.deselect_all_nodes();
+            viewer.background_clicked(snarl);
         }
     }
 

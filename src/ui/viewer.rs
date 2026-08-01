@@ -213,6 +213,21 @@ pub trait SnarlViewer<T> {
     ) {
         let _ = (node, inputs, outputs, ui, snarl);
     }
+    /// The background was clicked — the click landed on no node and no wire.
+    ///
+    /// Called right where the crate clears its own node selection, so an
+    /// application that keeps selection state of its OWN (a selected wire, a
+    /// selected comment, a focused group) clears it at the same moment and by
+    /// the same gesture.
+    ///
+    /// Without this the application cannot see the gesture at all: the crate
+    /// registers the background listener between the canvas and the nodes, and
+    /// anything the application registers is either under the canvas response
+    /// or on top of the nodes. Its own selection would then stay lit forever.
+    #[inline]
+    #[allow(unused_variables)]
+    fn background_clicked(&mut self, snarl: &mut Snarl<T>) {}
+
     /// Does this wire carry decorations drawn ALONG it?
     ///
     /// Defaults to `false`, and that default is the point: the polyline is only
