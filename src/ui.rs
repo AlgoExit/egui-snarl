@@ -2224,6 +2224,10 @@ where
     let mut new_pins_size = Vec2::ZERO;
 
     let r = node_frame.show(node_ui, |ui| {
+        // Above the frame's own fill, below every pin and label: see
+        // `SnarlViewer::draw_node_background`.
+        viewer.draw_node_background(node, node_frame_rect, ui.painter(), snarl);
+
         if viewer.has_node_style(node, &inputs, &outputs, snarl) {
             viewer.apply_node_style(ui.style_mut(), node, &inputs, &outputs, snarl);
         }

@@ -347,6 +347,29 @@ pub trait SnarlViewer<T> {
         let _ = (pos, ui, src_pins, snarl);
     }
 
+    /// Draws behind the node's contents, on top of the node frame's own fill.
+    ///
+    /// `Frame::show` reserves its background shape before running the content
+    /// closure, so anything painted here lands above that fill and below every
+    /// pin, label and body widget. That is the only position from which an app
+    /// can give a node a gradient, a texture or any other non-flat background:
+    /// `Frame::fill` is a single flat colour and offers no seam for one.
+    ///
+    /// `rect` is the node's frame rect, i.e. the node rect grown by the frame's
+    /// total margin — the same rectangle the frame paints itself into.
+    ///
+    /// Does nothing by default.
+    #[inline]
+    fn draw_node_background(
+        &mut self,
+        node: NodeId,
+        rect: Rect,
+        painter: &Painter,
+        snarl: &mut Snarl<T>,
+    ) {
+        let _ = (node, rect, painter, snarl);
+    }
+
     /// Checks if the node has something to show in context menu if right-clicked or long-touched on the node.
     #[inline]
     fn has_node_menu(&mut self, node: &T) -> bool {
