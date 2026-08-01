@@ -17,7 +17,7 @@ use egui::{
 use egui_scale::EguiScale;
 use smallvec::SmallVec;
 
-use crate::{InPin, InPinId, Node, NodeId, OutPin, OutPinId, Snarl, ui::wire::WireId};
+use crate::{InPin, InPinId, Node, NodeId, OutPin, OutPinId, Snarl};
 
 mod background_pattern;
 mod pin;
@@ -36,7 +36,10 @@ pub use self::{
     pin::{AnyPin, AnyPins, PinInfo, PinLayout, PinShape, PinWireInfo, SnarlPin},
     state::get_selected_nodes,
     viewer::SnarlViewer,
-    wire::{WireAxis, WireLayer, WireStyle, WireTangent, WireTangentRule, pick_wire_width},
+    wire::{
+        WireAxis, WireId, WireLayer, WireStyle, WireTangent, WireTangentRule, pick_wire_width,
+        wire_points,
+    },
 };
 
 /// Controls how header, pins, body and footer are placed in the node.
