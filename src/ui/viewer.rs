@@ -1,4 +1,4 @@
-use egui::{Painter, Pos2, Rect, Stroke, Style, Ui, emath::TSTransform};
+use egui::{Painter, Pos2, Rect, Shape, Stroke, Style, Ui, emath::TSTransform};
 
 use crate::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
 
@@ -213,6 +213,40 @@ pub trait SnarlViewer<T> {
     ) {
         let _ = (node, inputs, outputs, ui, snarl);
     }
+    /// Does this wire carry decorations drawn ALONG it?
+    ///
+    /// Defaults to `false`, and that default is the point: the polyline is only
+    /// computed for wires that answer `true`, so an editor that decorates
+    /// nothing pays nothing.
+    ///
+    /// Same shape as [`SnarlViewer::has_wire_menu`] for the same reason.
+    #[inline]
+    #[allow(unused_variables)]
+    fn has_wire_decorations(&mut self, from: &OutPinId, to: &InPinId, snarl: &Snarl<T>) -> bool {
+        false
+    }
+
+    /// Draw along a wire — execution-trace bubbles, a midpoint badge, flow
+    /// arrows.
+    ///
+    /// `points` is the polyline the wire was JUST drawn as, not a
+    /// re-derivation: decorations stay on the wire even when the tangent rule
+    /// or the sampling threshold changes. Shapes are appended to the wire
+    /// layer, so they follow the same `WireLayer` ordering as the wire itself.
+    ///
+    /// Only called when [`SnarlViewer::has_wire_decorations`] returned `true`.
+    #[inline]
+    #[allow(unused_variables)]
+    fn decorate_wire(
+        &mut self,
+        from: &OutPinId,
+        to: &InPinId,
+        points: &[Pos2],
+        shapes: &mut Vec<Shape>,
+        snarl: &Snarl<T>,
+    ) {
+    }
+
 
     /// Checks if the wire has something to show in a context menu when
     /// right-clicked or long-touched.
