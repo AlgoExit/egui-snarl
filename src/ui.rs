@@ -1442,6 +1442,16 @@ where
         }
     }
 
+    // The hover verdict goes out BEFORE the click one, so a viewer that keeps a
+    // hovered-wire state can rely on it being current when `wire_clicked`
+    // arrives. Unconditional on purpose — see `SnarlViewer::wire_hovered`.
+    viewer.wire_hovered(
+        hovered_wire
+            .as_ref()
+            .map(|wire| (&wire.out_pin, &wire.in_pin)),
+        snarl,
+    );
+
     // Remove hovered wire by second click
     if hovered_wire_disconnect && let Some(wire) = hovered_wire {
         let out_pin = OutPin::new(snarl, wire.out_pin);
