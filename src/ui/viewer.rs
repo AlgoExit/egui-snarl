@@ -280,6 +280,31 @@ pub trait SnarlViewer<T> {
         let _ = (from, to, ui, snarl);
     }
 
+    /// The wire under the pointer this frame, or `None` when there is none.
+    ///
+    /// Snarl already decides this (`hit_wire`, against the very path it drew),
+    /// and until now it kept the answer to itself: an app that wanted to react
+    /// to hover had either to re-run the hit test against a path it cannot see
+    /// — two geometries, free to disagree the moment the tangent rule changes —
+    /// or to abuse [`SnarlViewer::has_wire_menu`], which happens to be called
+    /// only for the hovered wire. Neither is a hook.
+    ///
+    /// ## Called once per frame, ALWAYS
+    ///
+    /// Including the frame the pointer leaves the last wire, and every frame it
+    /// is over nothing. That is deliberate: "no wire is hovered" is an answer,
+    /// and a hook that only fired on a hit would leave the app unable to tell
+    /// it from "the hook was never wired" — so every app would have to keep its
+    /// own per-frame bookkeeping to clear the state, which is the bug this hook
+    /// exists to remove.
+    ///
+    /// Fires before [`SnarlViewer::wire_clicked`], so a viewer may rely on the
+    /// hover being already recorded when the click arrives.
+    #[inline]
+    fn wire_hovered(&mut self, hovered: Option<(&OutPinId, &InPinId)>, snarl: &Snarl<T>) {
+        let _ = (hovered, snarl);
+    }
+
     /// The wire under the pointer was clicked with the primary button.
     ///
     /// Snarl keeps no wire selection of its own — a wire is not an entity it
