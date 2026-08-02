@@ -518,6 +518,7 @@ pub fn hit_wire(
 /// polyline.
 ///
 /// Additive and default-off: nothing inside the crate calls this.
+#[must_use]
 #[allow(clippy::too_many_arguments)]
 pub fn wire_points(
     ctx: &Context,
