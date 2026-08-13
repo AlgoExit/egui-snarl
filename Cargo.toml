@@ -65,3 +65,5 @@ required-features = ["serde", "egui-probe"]
 [patch.crates-io]
 # https://github.com/zakarumych/egui-scale/pull/6
 egui-scale = { git = "https://github.com/kisya-games/egui-scale", branch = "egui-0.36" }
+# https://github.com/zakarumych/egui-probe/pull/33
+egui-probe = { git = "https://github.com/kisya-games/egui-probe", branch = "egui-0.36" }
