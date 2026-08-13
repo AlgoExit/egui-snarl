@@ -11,9 +11,9 @@ documentation = "https://docs.rs/egui-snarl"
 repository = "https://github.com/zakarumych/egui-snarl"
 
 [workspace.dependencies]
-egui = { version = "0.35" }
-eframe = { version = "0.35" }
-egui_extras = { version = "0.35" }
+egui = { version = "0.36" }
+eframe = { version = "0.36" }
+egui_extras = { version = "0.36" }
 syn = { version = "2" }
 serde = { version = "1" }
 serde_json = { version = "1" }
@@ -61,3 +61,7 @@ wasm-bindgen-futures.workspace = true
 [[example]]
 name = "demo"
 required-features = ["serde", "egui-probe"]
+
+[patch.crates-io]
+# https://github.com/zakarumych/egui-scale/pull/6
+egui-scale = { git = "https://github.com/kisya-games/egui-scale", branch = "egui-0.36" }
